@@ -5,6 +5,12 @@ import AdminLayout from './components/AdminLayout';
 import Dashboard from './pages/Admin/Dashboard';
 import Category from './pages/Admin/Category';
 import SubCategory from './pages/Admin/SubCategory'; // <-- Import Real SubCategory Page
+import ProductCreation from './pages/Admin/ProductCreation';
+import UnitMaster from './pages/Admin/UnitMaster';
+import ProductImages from './pages/Admin/ProductImages';
+import ProductVariants from './pages/Admin/ProductVariants'; 
+import Orders from './pages/Admin/Orders';
+import Customers from './pages/Admin/Customers';
 
 const DummyPage = ({ title }) => (
   <div className="container-fluid">
@@ -23,13 +29,17 @@ function App() {
         
         <Route path="/" element={<AdminLayout />}>
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/orders" element={<DummyPage title="Orders" />} />
-          <Route path="/customers" element={<DummyPage title="Customers" />} />
-          
+          <Route path="/orders" element={<Orders />} />
+          <Route path="/customers" element={<Customers />} />
+         
           {/* Masters Routes */}
           <Route path="/masters/category" element={<Category />} />
-          <Route path="/masters/sub-category" element={<SubCategory />} /> {/* <-- Updated Route */}
-          <Route path="/masters/product-creation" element={<DummyPage title="Product Creation" />} />
+          <Route path="/masters/sub-category" element={<SubCategory />} /> 
+          <Route path="/masters/unit" element={<UnitMaster />} />{/* <-- Updated Route */}
+          <Route path="/masters/product-creation" element={<ProductCreation />} />
+          <Route path="/masters/product-images" element={<ProductImages />} />
+          <Route path="/masters/product-variants" element={<ProductVariants />} />
+          
         </Route>
       </Routes>
     </BrowserRouter>

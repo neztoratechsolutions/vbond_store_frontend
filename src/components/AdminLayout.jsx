@@ -41,7 +41,10 @@ function AdminLayout() {
   const masterSubItems = [
     { name: "Category", path: "/masters/category" },
     { name: "Sub Category", path: "/masters/sub-category" },
-    { name: "Product Creation", path: "/masters/product-creation" }
+     { name: "Unit Master", path: "/masters/unit" },
+    { name: "Product Creation", path: "/masters/product-creation" },
+    { name: "Product Images", path: "/masters/product-images" },
+     { name: "Product Variants", path: "/masters/product-variants" }
   ];
 
   return (
