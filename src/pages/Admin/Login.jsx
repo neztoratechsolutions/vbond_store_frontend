@@ -1,6 +1,9 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+// Uses your .env variable, or falls back to localhost:8000
+const API = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -15,20 +18,48 @@ function Login() {
     setLoading(true);
     setError(null);
 
-    setTimeout(() => {
-      if (email === "admin@gmail.com" && password === "admin123") {
-        const dummyUser = { id: 1, name: "Admin User", role: "super_admin" };
-        const dummyToken = "dummy_jwt_token_12345";
-        
-        localStorage.setItem("user", JSON.stringify(dummyUser));
-        localStorage.setItem("token", dummyToken);
-        
-        navigate("/dashboard");
-      } else {
-        setError("Invalid email or password. Try admin@gmail.com / admin123");
+    try {
+      // 1. Send request to your real backend API
+      const res = await fetch(`${API}/auth/login`, {
+        method: "POST",
+        headers: {
+          "accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const result = await res.json();
+
+      // 2. Check if the backend returned an error (like wrong password)
+      if (!res.ok) {
+        throw new Error(result.detail || result.message || "Invalid email or password.");
       }
+
+      // 3. Security Check: Only allow ADMIN role to login
+      if (result.role !== "ADMIN") {
+        throw new Error("Access Denied! You do not have admin privileges.");
+      }
+
+      // 4. Save exact response data to localStorage
+      const userData = {
+        id: result.user_id,
+        name: result.name,
+        email: result.email,
+        role: result.role
+      };
+
+      localStorage.setItem("token", result.access_token); // Saving the access_token
+      localStorage.setItem("user", JSON.stringify(userData));
+      
+      // 5. Redirect to dashboard
+      navigate("/dashboard");
+
+    } catch (err) {
+      setError(err.message || "Server error. Please try again.");
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -200,7 +231,7 @@ function Login() {
             </form>
 
             <p className="text-center text-muted mt-4" style={{ fontSize: "13px" }}>
-              <span className="badge bg-light text-dark border">Demo: admin@gmail.com / admin123</span>
+              <span className="badge bg-light text-dark border">Make sure your backend is running on port 8000</span>
             </p>
 
             <p className="text-center text-muted mt-3" style={{ fontSize: "14px" }}>

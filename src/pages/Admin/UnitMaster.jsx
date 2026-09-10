@@ -1,37 +1,68 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+
+// Falls back to localhost:8000 if .env variable is missing
+const API = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 
 function UnitMaster() {
   const redGradient = "linear-gradient(135deg, #FF512F 0%, #DD2476 100%)";
 
-  // State for Table
-  const [units, setUnits] = useState([
-    { id: 1, name: "Pieces", short_name: "Pc", description: "Individual items", display_order: "1", is_active: true },
-    { id: 2, name: "Kilograms", short_name: "Kg", description: "Weight in kilograms", display_order: "2", is_active: true },
-    { id: 3, name: "Liters", short_name: "L", description: "Volume in liters", display_order: "3", is_active: false },
-  ]);
+  // State for Table (Starts empty, fetched from API)
+  const [units, setUnits] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // State for Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUnitId, setEditingUnitId] = useState(null);
 
-  // Form State matching your SQLAlchemy Model
+  // Form State
   const [formData, setFormData] = useState({
     name: "",
     short_name: "",
     description: "",
-    display_order: "0",
+    display_order: 0,
     is_active: true,
   });
 
+  // 1. Fetch Units from API on component mount
+  useEffect(() => {
+    fetchUnits();
+  }, []);
+
+  const fetchUnits = async () => {
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem("token"); // If your endpoint requires auth
+      const res = await fetch(`${API}/units`, {
+        headers: { "accept": "application/json", "Authorization": `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setUnits(data);
+      } else {
+        console.error("Failed to fetch units");
+      }
+    } catch (err) {
+      console.error("Error fetching units:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const openModal = () => {
     setEditingUnitId(null);
-    setFormData({ name: "", short_name: "", description: "", display_order: "0", is_active: true });
+    setFormData({ name: "", short_name: "", description: "", display_order: 0, is_active: true });
     setIsModalOpen(true);
   };
 
   const openEditModal = (unit) => {
     setEditingUnitId(unit.id);
-    setFormData({ ...unit });
+    setFormData({ 
+      name: unit.name, 
+      short_name: unit.short_name, 
+      description: unit.description || "", 
+      display_order: unit.display_order, 
+      is_active: unit.is_active 
+    });
     setIsModalOpen(true);
   };
 
@@ -39,20 +70,89 @@ function UnitMaster() {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData({ ...formData, [name]: type === "checkbox" ? checked : value });
+    setFormData({ 
+      ...formData, 
+      [name]: type === "checkbox" ? checked : (name === "display_order" ? parseInt(value) : value) 
+    });
   };
 
-  const handleSubmit = (e) => {
+  // 2. Handle Create & Update via API
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (editingUnitId) {
-      // Update existing
-      setUnits(units.map(u => (u.id === editingUnitId ? { ...formData, id: editingUnitId } : u)));
-    } else {
-      // Add new
-      const newUnit = { ...formData, id: units.length + 1 };
-      setUnits([...units, newUnit]);
+    const token = localStorage.getItem("token");
+    
+    const payload = {
+      ...formData,
+      display_order: parseInt(formData.display_order) || 0
+    };
+
+    try {
+      if (editingUnitId) {
+        // UPDATE (PUT request)
+        const res = await fetch(`${API}/units/${editingUnitId}`, {
+          method: "PUT",
+          headers: {
+            "accept": "application/json",
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          const updatedUnit = await res.json();
+          setUnits(units.map(u => (u.id === editingUnitId ? updatedUnit : u)));
+          closeModal();
+        } else {
+          alert("Failed to update unit.");
+        }
+      } else {
+        // CREATE (POST request)
+        const res = await fetch(`${API}/units`, {
+          method: "POST",
+          headers: {
+            "accept": "application/json",
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          const newUnit = await res.json();
+          setUnits([...units, newUnit]);
+          closeModal();
+        } else {
+          alert("Failed to create unit. Make sure the name is unique.");
+        }
+      }
+    } catch (err) {
+      console.error("Error saving unit:", err);
+      alert("Server error while saving unit.");
     }
-    closeModal();
+  };
+
+  // 3. Handle Delete via API
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this unit?")) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API}/units/${id}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        // Remove from state instantly without reloading page
+        setUnits(units.filter(u => u.id !== id));
+      } else {
+        alert("Failed to delete unit.");
+      }
+    } catch (err) {
+      console.error("Error deleting unit:", err);
+      alert("Server error while deleting unit.");
+    }
   };
 
   const inputStyle = { padding: "14px", borderRadius: "10px", border: "1px solid #e9ecef", backgroundColor: "#f8f9fa", fontSize: "15px" };
@@ -76,49 +176,62 @@ function UnitMaster() {
       {/* Table Card */}
       <div className="card border-0 shadow-sm rounded-4">
         <div className="card-body p-4">
-          <div className="table-responsive">
-            <table className="table table-hover align-middle">
-              <thead>
-                <tr style={{ borderBottom: "2px solid #f0f0f0" }}>
-                  <th style={{ width: "80px" }} className="text-muted fw-medium">#</th>
-                  <th className="text-muted fw-medium">Unit Name</th>
-                  <th style={{ width: "150px" }} className="text-muted fw-medium">Short Name</th>
-                  <th className="text-muted fw-medium">Description</th>
-                  <th style={{ width: "100px" }} className="text-muted fw-medium">Order</th>
-                  <th style={{ width: "120px" }} className="text-muted fw-medium">Status</th>
-                  <th style={{ width: "100px" }} className="text-muted fw-medium text-end">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {units.map((unit) => (
-                  <tr key={unit.id} style={{ borderBottom: "1px solid #f8f9fa" }}>
-                    <td className="text-muted">{unit.id}</td>
-                    <td className="fw-bold text-dark">{unit.name}</td>
-                    <td><span className="badge bg-light text-dark border px-3 py-2" style={{ fontWeight: "500", borderRadius: "8px" }}>{unit.short_name}</span></td>
-                    <td className="text-muted text-truncate" style={{ maxWidth: "200px" }}>{unit.description || "-"}</td>
-                    <td className="text-muted">{unit.display_order}</td>
-                    <td>
-                      <span className="badge rounded-pill px-3 py-2" style={{ background: unit.is_active ? "rgba(40, 167, 69, 0.1)" : "rgba(108, 117, 125, 0.1)", color: unit.is_active ? "#28a745" : "#6c757d", fontWeight: "500" }}>
-                        {unit.is_active ? "Active" : "Inactive"}
-                      </span>
-                    </td>
-                    <td className="text-end">
-                      <div className="d-flex justify-content-end">
-                        {/* Edit Button */}
-                        <button className="btn btn-sm btn-link text-primary p-1 me-2" onClick={() => openEditModal(unit)}>
-                          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                        </button>
-                        {/* Delete Button */}
-                        <button className="btn btn-sm btn-link text-danger p-1">
-                          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                        </button>
-                      </div>
-                    </td>
+          {isLoading ? (
+            <div className="text-center py-5">
+              <div className="spinner-border text-danger" role="status"></div>
+              <p className="mt-2 text-muted">Loading units...</p>
+            </div>
+          ) : (
+            <div className="table-responsive">
+              <table className="table table-hover align-middle">
+                <thead>
+                  <tr style={{ borderBottom: "2px solid #f0f0f0" }}>
+                    <th style={{ width: "80px" }} className="text-muted fw-medium">#</th>
+                    <th className="text-muted fw-medium">Unit Name</th>
+                    <th style={{ width: "150px" }} className="text-muted fw-medium">Short Name</th>
+                    <th className="text-muted fw-medium">Description</th>
+                    <th style={{ width: "100px" }} className="text-muted fw-medium">Order</th>
+                    <th style={{ width: "120px" }} className="text-muted fw-medium">Status</th>
+                    <th style={{ width: "100px" }} className="text-muted fw-medium text-end">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {units.length > 0 ? (
+                    units.map((unit) => (
+                      <tr key={unit.id} style={{ borderBottom: "1px solid #f8f9fa" }}>
+                        <td className="text-muted">{unit.id}</td>
+                        <td className="fw-bold text-dark">{unit.name}</td>
+                        <td><span className="badge bg-light text-dark border px-3 py-2" style={{ fontWeight: "500", borderRadius: "8px" }}>{unit.short_name}</span></td>
+                        <td className="text-muted text-truncate" style={{ maxWidth: "200px" }}>{unit.description || "-"}</td>
+                        <td className="text-muted">{unit.display_order}</td>
+                        <td>
+                          <span className="badge rounded-pill px-3 py-2" style={{ background: unit.is_active ? "rgba(40, 167, 69, 0.1)" : "rgba(108, 117, 125, 0.1)", color: unit.is_active ? "#28a745" : "#6c757d", fontWeight: "500" }}>
+                            {unit.is_active ? "Active" : "Inactive"}
+                          </span>
+                        </td>
+                        <td className="text-end">
+                          <div className="d-flex justify-content-end">
+                            {/* Edit Button */}
+                            <button className="btn btn-sm btn-link text-primary p-1 me-2" onClick={() => openEditModal(unit)}>
+                              <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                            </button>
+                            {/* Delete Button */}
+                            <button className="btn btn-sm btn-link text-danger p-1" onClick={() => handleDelete(unit.id)}>
+                              <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="7" className="text-center text-muted py-5">No units found. Click "Add Unit" to create one.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
 
