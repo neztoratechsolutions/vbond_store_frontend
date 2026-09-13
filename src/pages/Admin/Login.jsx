@@ -230,9 +230,9 @@ function Login() {
 
             </form>
 
-            <p className="text-center text-muted mt-4" style={{ fontSize: "13px" }}>
+            {/* <p className="text-center text-muted mt-4" style={{ fontSize: "13px" }}>
               <span className="badge bg-light text-dark border">Make sure your backend is running on port 8000</span>
-            </p>
+            </p> */}
 
             <p className="text-center text-muted mt-3" style={{ fontSize: "14px" }}>
               Not an admin? <a href="#" className="fw-medium" style={{ textDecoration: "none", color: "#dd2476" }}>Go to Store Front</a>

@@ -44,7 +44,7 @@ function AdminLayout() {
      { name: "Unit Master", path: "/masters/unit" },
     { name: "Product Creation", path: "/masters/product-creation" },
     { name: "Product Images", path: "/masters/product-images" },
-     { name: "Product Variants", path: "/masters/product-variants" }
+    //  { name: "Product Variants", path: "/masters/product-variants" }
   ];
 
   return (
